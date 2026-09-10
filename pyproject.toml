@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "champ-tableops"
+version = "0.1.0"
+description = "Voice-guided Physical AI for bimanual table setting"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+  {name = "Champtron Systems LLC"}
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

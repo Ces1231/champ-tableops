@@ -1,0 +1,6 @@
+# Keep this initial dependency set deliberately small.
+# Pin Intel/VLA/simulator dependencies after the official track starter stack is confirmed.
+python-dotenv>=1.0,<2
+pydantic>=2.7,<3
+numpy>=1.26,<3
+pytest>=8,<9

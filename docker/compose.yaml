@@ -1,0 +1,10 @@
+services:
+  tableops:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    env_file:
+      - ../.env
+    volumes:
+      - ../simulation:/app/simulation
+      - ../outputs:/app/outputs
