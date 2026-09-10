@@ -4,3 +4,4 @@ python-dotenv>=1.0,<2
 pydantic>=2.7,<3
 numpy>=1.26,<3
 pytest>=8,<9
+mujoco>=3.3,<4
