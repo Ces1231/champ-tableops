@@ -282,16 +282,13 @@ def run_pick_place(
 
     from mujoco import viewer as mujoco_viewer
 
+    # On WSLg, viewer.close() can close the window but block the Python process.
+    # Leave process teardown to the CLI/demo entry point after it flushes output.
     viewer = mujoco_viewer.launch_passive(model, data)
-    try:
-        return _execute(
-            model,
-            data,
-            viewer=viewer,
-            realtime=realtime,
-            verbose=verbose,
-        )
-    finally:
-        # Explicitly close the passive viewer so WSLg/GLFW does not leave the
-        # visual demo window or Python process alive after the run completes.
-        viewer.close()
+    return _execute(
+        model,
+        data,
+        viewer=viewer,
+        realtime=realtime,
+        verbose=verbose,
+    )
