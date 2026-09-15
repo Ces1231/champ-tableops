@@ -13,34 +13,38 @@ class TaskIntent:
 
 
 class UnsupportedCommandError(ValueError):
-    """Raised when the Milestone 3 deterministic parser cannot map a command."""
+    """Raised when the deterministic parser cannot map a command safely."""
 
 
 def parse_command(command: str) -> TaskIntent:
-    """Convert a small set of natural-language table-setting commands into a task.
-
-    Milestone 3 intentionally uses a deterministic parser so the robotics demo remains
-    reliable. A VLA/LLM reasoning layer can later emit the same TaskIntent contract.
-    """
+    """Map supported table-setting commands into the verified controller contract."""
     normalized = re.sub(r"[^a-z0-9 ]+", " ", command.lower())
     normalized = " ".join(normalized.split())
 
     if not normalized:
         raise UnsupportedCommandError("Command is empty.")
 
-    if "table" in normalized and ("for two" in normalized or "for 2" in normalized):
-        raise UnsupportedCommandError(
-            "Two-place table setting requires the future bimanual/multi-object milestone."
+    supported_action = any(
+        token in normalized.split()
+        for token in ("set", "place", "move", "put")
+    )
+
+    two_setting_requested = (
+        "table" in normalized
+        and ("for two" in normalized or "for 2" in normalized)
+    )
+    if supported_action and two_setting_requested:
+        return TaskIntent(
+            action="set_table",
+            object_name="plates",
+            target="place_settings_1_2",
+            source_command=command,
         )
 
     plate_requested = "plate" in normalized
     single_setting_requested = (
         "table" in normalized
         and ("for one" in normalized or "for 1" in normalized)
-    )
-    supported_action = any(
-        token in normalized.split()
-        for token in ("set", "place", "move", "put")
     )
 
     if supported_action and (plate_requested or single_setting_requested):
@@ -52,6 +56,6 @@ def parse_command(command: str) -> TaskIntent:
         )
 
     raise UnsupportedCommandError(
-        "Supported Milestone 3 commands include 'Set the plate.' and "
-        "'Set the table for one.'"
+        "Supported commands include 'Set the plate.', 'Set the table for one.', "
+        "and 'Set the table for two.'"
     )
