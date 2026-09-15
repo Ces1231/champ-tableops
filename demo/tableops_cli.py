@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 import sys
 
@@ -15,6 +16,15 @@ from champ_tableops.reasoning.command_parser import (
     UnsupportedCommandError,
     parse_command,
 )
+
+
+def _finish(exit_code: int, *, visual: bool) -> int:
+    """Return normally headless; hard-exit visual mode to avoid WSLg GLFW hangs."""
+    sys.stdout.flush()
+    sys.stderr.flush()
+    if visual:
+        os._exit(exit_code)
+    return exit_code
 
 
 def main() -> int:
@@ -75,12 +85,12 @@ def main() -> int:
         print("[TableOps] VERIFY: placement accepted")
         print("[TableOps] SUCCESS")
         print("MILESTONE 3: SUCCESS")
-        return 0
+        return _finish(0, visual=not args.headless)
 
     print("[TableOps] VERIFY: placement rejected")
     print("[TableOps] FAILED")
     print("MILESTONE 3: FAILED")
-    return 1
+    return _finish(1, visual=not args.headless)
 
 
 if __name__ == "__main__":
