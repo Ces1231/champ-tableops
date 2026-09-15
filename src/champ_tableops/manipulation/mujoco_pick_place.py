@@ -174,8 +174,18 @@ class PickPlaceController:
 
         alignment_error = self._grasp_alignment_error()
         if alignment_error > 0.035:
+            gripper_pos = tuple(
+                round(float(v), 4) for v in self.data.site_xpos[self.grasp_site]
+            )
+            plate_pos = tuple(
+                round(float(v), 4)
+                for v in self.data.site_xpos[self.plate_grasp_site]
+            )
             raise RuntimeError(
-                f"Gripper is not aligned with plate: error={alignment_error:.4f} m"
+                "Gripper is not aligned with plate: "
+                f"error={alignment_error:.4f} m, "
+                f"gripper={gripper_pos}, plate={plate_pos}, "
+                f"slide_z={self._joint_position('slide_z'):.4f}"
             )
 
         self._announce("ACT: close gripper")
