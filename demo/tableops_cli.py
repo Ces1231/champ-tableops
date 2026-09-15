@@ -12,9 +12,10 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 from champ_tableops.manipulation.mujoco_pick_place import run_pick_place
-from champ_tableops.reasoning.command_parser import (
-    UnsupportedCommandError,
-    parse_command,
+from champ_tableops.reasoning.command_parser import UnsupportedCommandError
+from champ_tableops.reasoning.openvino_reasoner import (
+    OpenVINOReasoningError,
+    reason_command,
 )
 
 
@@ -29,7 +30,7 @@ def _finish(exit_code: int, *, visual: bool) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="CHAMP TableOps natural-language robotics demo."
+        description="CHAMP TableOps natural-language Physical AI demo."
     )
     parser.add_argument(
         "command",
@@ -54,6 +55,25 @@ def main() -> int:
             "the plate before release."
         ),
     )
+    parser.add_argument(
+        "--reasoner",
+        choices=("auto", "deterministic", "openvino"),
+        default=os.environ.get("CHAMP_TABLEOPS_REASONER", "auto"),
+        help=(
+            "Reasoning backend. auto uses OpenVINO when a model is configured and "
+            "otherwise preserves the deterministic fallback."
+        ),
+    )
+    parser.add_argument(
+        "--openvino-model",
+        default=os.environ.get("CHAMP_TABLEOPS_OPENVINO_MODEL"),
+        help="Path to an OpenVINO GenAI LLM directory.",
+    )
+    parser.add_argument(
+        "--openvino-device",
+        default=os.environ.get("CHAMP_TABLEOPS_OPENVINO_DEVICE", "CPU"),
+        help="OpenVINO inference device, e.g. CPU, GPU, or NPU.",
+    )
     args = parser.parse_args()
 
     command = " ".join(args.command).strip()
@@ -66,13 +86,30 @@ def main() -> int:
     print(f"Command: {command}")
 
     try:
-        intent = parse_command(command)
+        reasoning = reason_command(
+            command,
+            backend=args.reasoner,
+            model_path=args.openvino_model,
+            device=args.openvino_device,
+        )
+        intent = reasoning.intent
     except UnsupportedCommandError as exc:
         print("[TableOps] REASON: command not supported")
         print(f"[TableOps] ERROR: {exc}")
         return 2
+    except OpenVINOReasoningError as exc:
+        print("[TableOps] REASON: OpenVINO reasoning unavailable")
+        print(f"[TableOps] ERROR: {exc}")
+        return 2
 
     print("[TableOps] REASON: interpreting request")
+    print(f"[TableOps] REASONER: {reasoning.backend}")
+    if reasoning.backend == "openvino_genai":
+        print(f"[TableOps] INTEL: OpenVINO GenAI active on {args.openvino_device}")
+    if reasoning.fallback_used:
+        print("[TableOps] REASONER FALLBACK: deterministic")
+        print(f"[TableOps] FALLBACK REASON: {reasoning.fallback_reason}")
+
     print(f"[TableOps] INTENT: {intent.action}")
     print(f"[TableOps] OBJECT: {intent.object_name}")
     print(f"[TableOps] TARGET: {intent.target}")
@@ -107,7 +144,9 @@ def main() -> int:
     print(f"[TableOps] TARGET POSITION: {result.target_position}")
     print(f"[TableOps] PLANAR ERROR: {result.planar_error:.4f} m")
 
-    milestone = 4 if args.demo_correction else 3
+    milestone = 5 if reasoning.backend == "openvino_genai" else (
+        4 if args.demo_correction else 3
+    )
 
     if result.success:
         print("[TableOps] VERIFY: placement accepted")
