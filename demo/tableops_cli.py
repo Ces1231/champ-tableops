@@ -11,6 +11,7 @@ SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
+from champ_tableops.manipulation.mujoco_bimanual import run_bimanual_table_setting
 from champ_tableops.manipulation.mujoco_pick_place import run_pick_place
 from champ_tableops.reasoning.command_parser import UnsupportedCommandError
 from champ_tableops.reasoning.openvino_reasoner import (
@@ -35,7 +36,7 @@ def main() -> int:
     parser.add_argument(
         "command",
         nargs="*",
-        help="Natural-language task, e.g. Set the plate.",
+        help="Natural-language task, e.g. Set the table for two.",
     )
     parser.add_argument(
         "--headless",
@@ -51,8 +52,8 @@ def main() -> int:
         "--demo-correction",
         action="store_true",
         help=(
-            "Inject a 10 cm placement error, verify it, and physically correct "
-            "the plate before release."
+            "Inject a 10 cm placement error and demonstrate Verify -> Correct. "
+            "For bimanual mode, the right-hand placement is disturbed."
         ),
     )
     parser.add_argument(
@@ -114,6 +115,54 @@ def main() -> int:
     print(f"[TableOps] OBJECT: {intent.object_name}")
     print(f"[TableOps] TARGET: {intent.target}")
     print("[TableOps] PLAN: generated manipulation sequence")
+
+    is_bimanual = (
+        intent.action == "set_table"
+        and intent.object_name == "plates"
+        and intent.target == "place_settings_1_2"
+    )
+
+    if is_bimanual:
+        print("[TableOps] MODE: BIMANUAL / TWO PLACE SETTINGS")
+        if args.demo_correction:
+            print("[TableOps] DEMO: inject 0.10 m error into right-hand placement")
+            print("[TableOps] GOAL: two arms + VERIFY -> CORRECT recovery")
+        print("[TableOps] ACT: executing coordinated MuJoCo manipulation")
+
+        result = run_bimanual_table_setting(
+            render=not args.headless,
+            realtime=not args.fast and not args.headless,
+            verbose=True,
+            right_placement_offset_x=0.10 if args.demo_correction else 0.0,
+            correct_if_needed=args.demo_correction,
+        )
+
+        print(
+            "[TableOps] LEFT FINAL: "
+            f"{result.left.final_position}; target={result.left.target_position}; "
+            f"error={result.left.planar_error:.4f} m"
+        )
+        print(
+            "[TableOps] RIGHT FINAL: "
+            f"{result.right.final_position}; target={result.right.target_position}; "
+            f"error={result.right.planar_error:.4f} m"
+        )
+        if args.demo_correction:
+            print(
+                "[TableOps] RIGHT CORRECTION APPLIED: "
+                f"{'yes' if result.right.correction_applied else 'no'}"
+            )
+
+        if result.success:
+            print("[TableOps] VERIFY: both place settings accepted")
+            print("[TableOps] SUCCESS")
+            print("MILESTONE 6: SUCCESS")
+            return _finish(0, visual=not args.headless)
+
+        print("[TableOps] VERIFY: one or more place settings rejected")
+        print("[TableOps] FAILED")
+        print("MILESTONE 6: FAILED")
+        return _finish(1, visual=not args.headless)
 
     if args.demo_correction:
         print("[TableOps] DEMO: inject 0.10 m placement error")
