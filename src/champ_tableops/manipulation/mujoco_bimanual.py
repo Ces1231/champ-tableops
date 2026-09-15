@@ -68,7 +68,13 @@ class BimanualController:
         self.grasp_welds: dict[str, int] = {}
 
         for arm in self.ARMS:
-            for actuator in ("x_position", "y_position", "z_position", "grip_a", "grip_b"):
+            for actuator in (
+                "x_position",
+                "y_position",
+                "z_position",
+                "grip_a",
+                "grip_b",
+            ):
                 name = f"{arm}_{actuator}"
                 self.actuators[name] = mujoco.mj_name2id(
                     model, mujoco.mjtObj.mjOBJ_ACTUATOR, name
@@ -207,7 +213,10 @@ class BimanualController:
 
         self._announce("PLAN: coordinate left and right manipulators")
         self._move(
-            {arm: {"x": 0.25, "y": 0.0, "z": -0.25, "grip": 0.0} for arm in both}
+            {
+                arm: {"x": 0.25, "y": 0.0, "z": -0.25, "grip": 0.0}
+                for arm in both
+            }
         )
 
         self._announce("ACT: both manipulators descend to grasp poses")
@@ -236,7 +245,10 @@ class BimanualController:
         self._move(
             {
                 "left": {"x": 0.95, "y": 0.0},
-                "right": {"x": 0.95 + self.right_placement_offset_x, "y": 0.0},
+                "right": {
+                    "x": 0.95 + self.right_placement_offset_x,
+                    "y": 0.0,
+                },
             }
         )
 
@@ -295,9 +307,13 @@ class BimanualController:
         left_final, left_target, left_error = self._placement_state("left")
         right_final, right_target, right_error = self._placement_state("right")
 
-        left_success = left_error < self.correction_threshold and left_final[2] < 0.13
-        right_success = right_error < self.correction_threshold and right_final[2] < 0.13
-        success = left_success and right_success
+        left_success = bool(
+            left_error < self.correction_threshold and float(left_final[2]) < 0.13
+        )
+        right_success = bool(
+            right_error < self.correction_threshold and float(right_final[2]) < 0.13
+        )
+        success = bool(left_success and right_success)
 
         self._announce("SUCCESS" if success else "FAILED")
         return BimanualResult(
