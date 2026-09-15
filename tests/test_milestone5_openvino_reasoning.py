@@ -83,15 +83,19 @@ def test_openvino_reasoner_rejects_unverified_controller_task():
         )
 
 
-def test_openvino_reasoner_propagates_model_rejection():
+def test_openvino_reasoner_maps_two_place_request_to_bimanual_task():
     _, factory = factory_for(
-        '{"supported": false, "reason": "Two place settings are not implemented."}'
+        '{"supported": true, "action": "set_table", "object": "plates", '
+        '"target": "place_settings_1_2"}'
     )
 
-    with pytest.raises(UnsupportedCommandError, match="Two place settings"):
-        OpenVINOReasoner("fake-model", pipeline_factory=factory).reason(
-            "Set the table for two."
-        )
+    result = OpenVINOReasoner("fake-model", pipeline_factory=factory).reason(
+        "Set the table for two."
+    )
+
+    assert result.intent.action == "set_table"
+    assert result.intent.object_name == "plates"
+    assert result.intent.target == "place_settings_1_2"
 
 
 def test_auto_backend_falls_back_to_deterministic_parser_on_runtime_failure():
