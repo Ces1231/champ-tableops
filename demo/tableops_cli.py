@@ -8,6 +8,7 @@ import sys
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = REPO_ROOT / "src"
+DEFAULT_SHOWCASE_MODEL = REPO_ROOT / "models" / "qwen2.5-1.5b-instruct-int4-ov"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
@@ -57,6 +58,14 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--showcase",
+        action="store_true",
+        help=(
+            "Run the polished hackathon path: Intel OpenVINO GenAI + two-arm "
+            "table setting + intentional right-side error + closed-loop correction."
+        ),
+    )
+    parser.add_argument(
         "--reasoner",
         choices=("auto", "deterministic", "openvino"),
         default=os.environ.get("CHAMP_TABLEOPS_REASONER", "auto"),
@@ -77,14 +86,32 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    command = " ".join(args.command).strip()
-    if not command:
-        command = input("Command: ").strip()
+    if args.showcase:
+        command = "Set the table for two."
+        args.reasoner = "openvino"
+        args.demo_correction = True
+        if not args.openvino_model and DEFAULT_SHOWCASE_MODEL.exists():
+            args.openvino_model = str(DEFAULT_SHOWCASE_MODEL)
+    else:
+        command = " ".join(args.command).strip()
+        if not command:
+            command = input("Command: ").strip()
 
     print("\n" + "=" * 54)
     print("                 CHAMP TableOps")
     print("=" * 54)
     print(f"Command: {command}")
+
+    if args.showcase:
+        print("[TableOps] SHOWCASE MODE: Intel OpenVINO + bimanual + closed-loop recovery")
+        print("[TableOps] SHOWCASE TASK: two place settings; disturb right placement; self-correct")
+        if not args.openvino_model:
+            print("[TableOps] SHOWCASE ERROR: OpenVINO model is not configured")
+            print(
+                "[TableOps] SETUP: export CHAMP_TABLEOPS_OPENVINO_MODEL="
+                '"$PWD/models/qwen2.5-1.5b-instruct-int4-ov"'
+            )
+            return 2
 
     try:
         reasoning = reason_command(
@@ -157,11 +184,15 @@ def main() -> int:
             print("[TableOps] VERIFY: both place settings accepted")
             print("[TableOps] SUCCESS")
             print("MILESTONE 6: SUCCESS")
+            if args.showcase:
+                print("CHAMP TABLEOPS SHOWCASE: SUCCESS")
             return _finish(0, visual=not args.headless)
 
         print("[TableOps] VERIFY: one or more place settings rejected")
         print("[TableOps] FAILED")
         print("MILESTONE 6: FAILED")
+        if args.showcase:
+            print("CHAMP TABLEOPS SHOWCASE: FAILED")
         return _finish(1, visual=not args.headless)
 
     if args.demo_correction:
