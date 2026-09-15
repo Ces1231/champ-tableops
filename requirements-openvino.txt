@@ -1,0 +1,6 @@
+-r requirements.txt
+
+# Optional Milestone 5 Intel reasoning stack.
+# OpenVINO GenAI installs the matching OpenVINO runtime dependencies.
+openvino-genai>=2026.3,<2027
+huggingface-hub>=0.34,<2
