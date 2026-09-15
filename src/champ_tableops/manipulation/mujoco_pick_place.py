@@ -260,9 +260,9 @@ def run_pick_place(
             verbose=verbose,
         )
 
-    import mujoco.viewer
+    from mujoco import viewer as mujoco_viewer
 
-    with mujoco.viewer.launch_passive(model, data) as viewer:
+    with mujoco_viewer.launch_passive(model, data) as viewer:
         return _execute(
             model,
             data,
