@@ -24,9 +24,12 @@ def test_supported_commands_map_to_plate_place_task(command: str):
     assert intent.target == "place_setting_1"
 
 
-def test_two_place_setting_is_deferred():
-    with pytest.raises(UnsupportedCommandError, match="Two-place"):
-        parse_command("Set the table for two.")
+def test_two_place_setting_maps_to_bimanual_task():
+    intent = parse_command("Set the table for two.")
+
+    assert intent.action == "set_table"
+    assert intent.object_name == "plates"
+    assert intent.target == "place_settings_1_2"
 
 
 def test_unknown_command_is_rejected():
