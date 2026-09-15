@@ -21,14 +21,20 @@ class PickPlaceResult:
     target_position: tuple[float, float, float]
     planar_error: float
     phases: tuple[str, ...]
+    correction_applied: bool = False
+    initial_planar_error: float | None = None
 
 
 class PickPlaceController:
-    """Deterministic Milestone 2 controller for the CHAMP TableOps demo.
+    """Deterministic MuJoCo pick-and-place controller for CHAMP TableOps.
 
     The robot moves through MuJoCo position actuators. The plate free joint is never
     rewritten by this controller. At grasp time, a site-to-site weld constraint is
     enabled to model a stable closed gripper; it is disabled again at release.
+
+    Milestone 4 can intentionally inject a placement offset, verify the resulting
+    error while the plate is still held, then physically correct the placement
+    before release.
     """
 
     def __init__(
@@ -39,12 +45,20 @@ class PickPlaceController:
         viewer: Any | None = None,
         realtime: bool = False,
         verbose: bool = True,
+        placement_offset_x: float = 0.0,
+        placement_offset_y: float = 0.0,
+        correct_if_needed: bool = False,
+        correction_threshold: float = 0.04,
     ) -> None:
         self.model = model
         self.data = data
         self.viewer = viewer
         self.realtime = realtime
         self.verbose = verbose
+        self.placement_offset_x = placement_offset_x
+        self.placement_offset_y = placement_offset_y
+        self.correct_if_needed = correct_if_needed
+        self.correction_threshold = correction_threshold
         self.phases: list[str] = []
 
         self.actuators = {
@@ -171,6 +185,15 @@ class PickPlaceController:
             )
         )
 
+    def _placement_state(
+        self,
+    ) -> tuple[np.ndarray, np.ndarray, float]:
+        mujoco.mj_forward(self.model, self.data)
+        final = self.data.xpos[self.plate_body].copy()
+        target = self.data.site_xpos[self.target_site].copy()
+        planar_error = float(np.linalg.norm(final[:2] - target[:2]))
+        return final, target, planar_error
+
     def run(self) -> PickPlaceResult:
         self._announce("PERCEIVE: settle scene and locate plate")
         self._set_controls(x=0.10, y=0.0, z=-0.18, grip=0.0)
@@ -210,11 +233,52 @@ class PickPlaceController:
         self._move(z=-0.20)
 
         self._announce("ACT: transfer plate to target")
-        self._move(x=0.95, y=0.0)
+        self._move(
+            x=0.95 + self.placement_offset_x,
+            y=self.placement_offset_y,
+        )
 
         self._announce("ACT: lower plate")
         self._move(z=-0.445)
         self._step(100)
+
+        correction_applied = False
+        initial_planar_error: float | None = None
+
+        if self.correct_if_needed:
+            self._announce("VERIFY: pre-release placement check")
+            _, _, initial_planar_error = self._placement_state()
+
+            if initial_planar_error >= self.correction_threshold:
+                self._announce(
+                    "VERIFY: placement outside tolerance "
+                    f"({initial_planar_error:.4f} m)"
+                )
+                self._announce("CORRECT: reposition plate to target")
+
+                # Lift before correcting laterally so the plate does not scrape the table.
+                self._move(z=-0.20)
+                self._move(x=0.95, y=0.0)
+                self._move(z=-0.445)
+                self._step(100)
+                correction_applied = True
+
+                _, _, corrected_error = self._placement_state()
+                if corrected_error < self.correction_threshold:
+                    self._announce(
+                        "VERIFY: correction within tolerance "
+                        f"({corrected_error:.4f} m)"
+                    )
+                else:
+                    self._announce(
+                        "VERIFY: correction still outside tolerance "
+                        f"({corrected_error:.4f} m)"
+                    )
+            else:
+                self._announce(
+                    "VERIFY: placement within tolerance "
+                    f"({initial_planar_error:.4f} m)"
+                )
 
         self._announce("ACT: release plate")
         self.data.eq_active[self.grasp_weld] = 0
@@ -226,11 +290,8 @@ class PickPlaceController:
         self._move(x=0.75)
 
         self._announce("VERIFY: measure final placement")
-        mujoco.mj_forward(self.model, self.data)
-        final = self.data.xpos[self.plate_body].copy()
-        target = self.data.site_xpos[self.target_site].copy()
-        planar_error = float(np.linalg.norm(final[:2] - target[:2]))
-        success = planar_error < 0.04 and final[2] < 0.13
+        final, target, planar_error = self._placement_state()
+        success = planar_error < self.correction_threshold and final[2] < 0.13
 
         self._announce("SUCCESS" if success else "FAILED")
         return PickPlaceResult(
@@ -239,6 +300,8 @@ class PickPlaceController:
             target_position=tuple(float(v) for v in target),
             planar_error=planar_error,
             phases=tuple(self.phases),
+            correction_applied=correction_applied,
+            initial_planar_error=initial_planar_error,
         )
 
 
@@ -249,6 +312,9 @@ def _execute(
     viewer: Any | None,
     realtime: bool,
     verbose: bool,
+    placement_offset_x: float,
+    placement_offset_y: float,
+    correct_if_needed: bool,
 ) -> PickPlaceResult:
     controller = PickPlaceController(
         model,
@@ -256,6 +322,9 @@ def _execute(
         viewer=viewer,
         realtime=realtime,
         verbose=verbose,
+        placement_offset_x=placement_offset_x,
+        placement_offset_y=placement_offset_y,
+        correct_if_needed=correct_if_needed,
     )
     return controller.run()
 
@@ -266,6 +335,9 @@ def run_pick_place(
     render: bool = False,
     realtime: bool = False,
     verbose: bool = True,
+    placement_offset_x: float = 0.0,
+    placement_offset_y: float = 0.0,
+    correct_if_needed: bool = False,
 ) -> PickPlaceResult:
     model = mujoco.MjModel.from_xml_path(str(model_path))
     data = mujoco.MjData(model)
@@ -278,6 +350,9 @@ def run_pick_place(
             viewer=None,
             realtime=realtime,
             verbose=verbose,
+            placement_offset_x=placement_offset_x,
+            placement_offset_y=placement_offset_y,
+            correct_if_needed=correct_if_needed,
         )
 
     from mujoco import viewer as mujoco_viewer
@@ -291,4 +366,7 @@ def run_pick_place(
         viewer=viewer,
         realtime=realtime,
         verbose=verbose,
+        placement_offset_x=placement_offset_x,
+        placement_offset_y=placement_offset_y,
+        correct_if_needed=correct_if_needed,
     )
