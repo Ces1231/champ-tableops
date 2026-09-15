@@ -8,39 +8,56 @@ The system is designed around a closed-loop Physical AI workflow:
 
 **Perceive → Reason → Plan → Act → Verify → Correct**
 
-The initial demo target is autonomous table setting in simulation using robotic manipulation, multimodal reasoning, and optional real-time voice interaction.
+The current prototype performs natural-language-guided table manipulation in MuJoCo, verifies the result, and can physically correct an intentionally bad placement before completing the task.
 
 ## Current Hackathon Status
 
-**Milestone 2 is working in automated CI:** an actuated MuJoCo manipulator approaches a plate, aligns with it, closes its gripper, lifts the plate, transfers it to a target place setting, releases it, retreats, and verifies the final placement.
+### Milestone 1 — Complete
 
-Unlike the original Milestone 1 proof of concept, the Milestone 2 controller does **not** rewrite the plate free-joint position to move it. Cartesian robot motion is generated through MuJoCo position actuators. Once the gripper is aligned and closed, a temporary MuJoCo equality constraint models a stable grasp; the constraint is released at placement.
+Load a MuJoCo tabletop scene and verify programmatic object movement.
 
-Current demo loop:
+### Milestone 2 — Complete
 
-**Perceive → Plan → Approach → Grasp → Lift → Transfer → Place → Release → Verify**
+An actuated MuJoCo manipulator approaches a plate, aligns with it, closes its gripper, lifts it, transfers it to the target, releases it, retreats, and verifies final placement.
+
+The controller does **not** rewrite the plate free-joint position to perform the move. Cartesian motion is generated through MuJoCo actuators. A temporary equality constraint models a stable grasp and is released at placement.
+
+### Milestone 3 — Complete
+
+Natural-language commands such as `Set the plate.` and `Set the table for one.` are converted into a verified task contract and executed by the robotic controller.
+
+### Milestone 4 — Complete
+
+Closed-loop recovery is working. TableOps can intentionally place the plate outside tolerance, detect the error, execute a correction action, re-verify the scene, and finish successfully.
+
+### Milestone 5 — Implementation complete / local OpenVINO model validation next
+
+An Intel OpenVINO GenAI reasoning adapter now maps natural-language commands into the same verified `TaskIntent` contract. The deterministic parser remains available as a fallback so a model/runtime problem does not destroy the robotics demo.
+
+Current end-to-end target:
+
+**Natural language → OpenVINO GenAI → Plan → Act → Verify → Correct → Success**
 
 ## Objectives
 
 - Observe a simulated tabletop scene.
-- Identify plates, cups, utensils, napkins, and other task objects.
 - Convert natural-language or spoken instructions into structured tasks.
-- Plan a sequence of manipulation actions.
-- Coordinate two simulated robot arms.
-- Verify that the resulting scene satisfies the requested task.
+- Use Intel OpenVINO GenAI for local task reasoning.
+- Plan manipulation actions.
+- Execute robotic pick-and-place in MuJoCo.
+- Verify the resulting scene.
 - Correct failed or incomplete placements.
+- Extend to additional objects and a second manipulator.
 
 ## Stack
 
 - Python 3.11+
 - MuJoCo 3.3+
-- Intel OpenVINO / Intel Physical AI tooling as required by the challenge
-- Multimodal/VLA model selected from official challenge resources
-- Speechmatics for optional speech-to-text
-- Pytest for validation
+- Intel OpenVINO GenAI
+- Qwen2.5-1.5B-Instruct INT4 OpenVINO IR model for the Milestone 5 local reasoning demo
+- Pytest
 - Docker for reproducible execution
-
-> Final Intel models, SDKs, and starter repositories should be pinned only after the official track brief is confirmed.
+- Optional speech-to-text / voice interface in a later milestone
 
 ## Repository Layout
 
@@ -49,8 +66,10 @@ champ-tableops/
 ├── .github/workflows/
 ├── assets/
 ├── demo/
+│   └── tableops_cli.py
 ├── docker/
 ├── docs/
+│   └── openvino_reasoning.md
 ├── outputs/
 ├── scripts/
 ├── simulation/
@@ -63,22 +82,16 @@ champ-tableops/
 │   ├── perception/
 │   ├── planning/
 │   ├── reasoning/
+│   │   ├── command_parser.py
+│   │   └── openvino_reasoner.py
 │   ├── verification/
 │   └── voice/
+├── requirements.txt
+├── requirements-openvino.txt
 └── tests/
 ```
 
 ## Quick Start
-
-### Windows PowerShell
-
-```powershell
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-pytest
-```
 
 ### Linux / WSL / macOS
 
@@ -87,65 +100,116 @@ python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
-pytest
+pytest -v
 ```
 
-## Milestone 2 Demo
+### Windows PowerShell
 
-From the repository root, launch the visual MuJoCo demo:
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+pytest -v
+```
+
+## Known-Good Deterministic Demo
+
+Headless:
 
 ```bash
-python simulation/demo_pick_place.py
+python demo/tableops_cli.py --headless --fast "Set the plate."
 ```
 
-The demo executes the command concept:
-
-> **"Set the plate."**
-
-For a fast headless validation run:
+Visual:
 
 ```bash
-python simulation/demo_pick_place.py --headless --fast
+python demo/tableops_cli.py "Set the plate."
 ```
 
-Expected final output includes:
-
-```text
-[TableOps] VERIFY: measure final placement
-[TableOps] SUCCESS
-MILESTONE 2: SUCCESS
-```
-
-The automated equivalent is covered by:
+Closed-loop correction:
 
 ```bash
-pytest tests/test_milestone2_pick_place.py -v
+python demo/tableops_cli.py --headless --fast --demo-correction "Set the plate."
 ```
 
-## Milestone Roadmap
+## Milestone 5 — Intel OpenVINO GenAI
 
-**Milestone 1 — Complete:** load MuJoCo scene and programmatically validate movement of one table object.
+Install the optional stack:
 
-**Milestone 2 — Complete in CI / pending local visual confirmation:** actuated manipulator performs one plate pick-and-place and verifies final placement.
+```bash
+python -m pip install -r requirements-openvino.txt
+```
 
-**Milestone 3 — Next:** connect natural-language task input to the manipulation controller, then add additional table objects.
+Download the recommended OpenVINO-optimized model:
 
-**Milestone 4 — Stretch:** multimodal perception, second manipulator, voice input, and Verify → Correct recovery behavior.
+```bash
+python - <<'PY'
+from huggingface_hub import snapshot_download
 
-## Target Demo Scenario
+snapshot_download(
+    repo_id="OpenVINO/Qwen2.5-1.5B-Instruct-int4-ov",
+    local_dir="models/qwen2.5-1.5b-instruct-int4-ov",
+)
+PY
+```
 
-Example command:
+Configure the model:
 
-> "Set the table for two."
+```bash
+export CHAMP_TABLEOPS_OPENVINO_MODEL="$PWD/models/qwen2.5-1.5b-instruct-int4-ov"
+export CHAMP_TABLEOPS_OPENVINO_DEVICE=CPU
+```
 
-Target workflow:
+Run explicit Intel reasoning:
 
-1. Perception detects available objects and their locations.
-2. Reasoning interprets the desired final scene.
-3. Planning generates ordered manipulation tasks.
-4. Manipulation executes pick-and-place actions.
-5. Verification checks the resulting scene.
-6. Correction retries or repairs failed placements.
+```bash
+python demo/tableops_cli.py \
+  --headless --fast \
+  --reasoner openvino \
+  "Set the plate."
+```
+
+Full OpenVINO + recovery demo:
+
+```bash
+python demo/tableops_cli.py \
+  --reasoner openvino \
+  --demo-correction \
+  "Set the plate."
+```
+
+See `docs/openvino_reasoning.md` for setup details and fallback behavior.
+
+## Safety Boundary
+
+The AI reasoner does not directly control robot joints. It must emit the currently verified controller contract:
+
+```json
+{
+  "action": "place",
+  "object": "plate",
+  "target": "place_setting_1"
+}
+```
+
+Any model-produced task outside that contract is rejected before manipulation begins.
+
+## Roadmap
+
+**Milestone 1 — Complete:** base MuJoCo scene.
+
+**Milestone 2 — Complete:** actuator-driven plate pick-and-place.
+
+**Milestone 3 — Complete:** natural-language command interface.
+
+**Milestone 4 — Complete:** Verify → Correct closed-loop recovery.
+
+**Milestone 5 — Current:** Intel OpenVINO GenAI reasoning, pending local model validation.
+
+**Milestone 6 — Next:** add a second table object and expand scene/task planning.
+
+**Milestone 7 — Stretch:** second manipulator / bimanual coordination, richer perception, and voice input.
 
 ## License
 
