@@ -101,6 +101,11 @@ class PickPlaceController:
         qpos_address = self.model.jnt_qposadr[joint_id]
         return float(self.data.qpos[qpos_address])
 
+    def _joint_velocity(self, name: str) -> float:
+        joint_id = self.joints[name]
+        dof_address = self.model.jnt_dofadr[joint_id]
+        return float(self.data.qvel[dof_address])
+
     def _set_controls(
         self,
         *,
@@ -134,6 +139,7 @@ class PickPlaceController:
         z: float | None = None,
         grip: float | None = None,
         tolerance: float = 0.006,
+        velocity_tolerance: float = 0.04,
         max_steps: int = 1800,
     ) -> None:
         targets = self._set_controls(x=x, y=y, z=z, grip=grip)
@@ -141,12 +147,16 @@ class PickPlaceController:
             self._step()
             if all(
                 abs(self._joint_position(joint_name) - target) <= tolerance
+                and abs(self._joint_velocity(joint_name)) <= velocity_tolerance
                 for joint_name, target in targets.items()
             ):
-                self._step(40)
                 return
         current = {
-            name: round(self._joint_position(name), 4) for name in targets
+            name: {
+                "q": round(self._joint_position(name), 4),
+                "qd": round(self._joint_velocity(name), 4),
+            }
+            for name in targets
         }
         raise RuntimeError(
             f"Manipulator failed to converge. targets={targets}, current={current}"
