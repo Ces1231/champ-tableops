@@ -29,7 +29,7 @@ def _finish(exit_code: int, *, visual: bool) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="CHAMP TableOps Milestone 3 natural-language robotics demo."
+        description="CHAMP TableOps natural-language robotics demo."
     )
     parser.add_argument(
         "command",
@@ -45,6 +45,14 @@ def main() -> int:
         "--fast",
         action="store_true",
         help="Do not pace simulation steps in real time.",
+    )
+    parser.add_argument(
+        "--demo-correction",
+        action="store_true",
+        help=(
+            "Inject a 10 cm placement error, verify it, and physically correct "
+            "the plate before release."
+        ),
     )
     args = parser.parse_args()
 
@@ -69,27 +77,47 @@ def main() -> int:
     print(f"[TableOps] OBJECT: {intent.object_name}")
     print(f"[TableOps] TARGET: {intent.target}")
     print("[TableOps] PLAN: generated manipulation sequence")
+
+    if args.demo_correction:
+        print("[TableOps] DEMO: inject 0.10 m placement error")
+        print("[TableOps] GOAL: demonstrate VERIFY -> CORRECT recovery")
+
     print("[TableOps] ACT: executing MuJoCo manipulation")
 
     result = run_pick_place(
         render=not args.headless,
         realtime=not args.fast and not args.headless,
         verbose=True,
+        placement_offset_x=0.10 if args.demo_correction else 0.0,
+        correct_if_needed=args.demo_correction,
     )
+
+    if result.initial_planar_error is not None:
+        print(
+            "[TableOps] INITIAL PLANAR ERROR: "
+            f"{result.initial_planar_error:.4f} m"
+        )
+    if args.demo_correction:
+        print(
+            "[TableOps] CORRECTION APPLIED: "
+            f"{'yes' if result.correction_applied else 'no'}"
+        )
 
     print(f"[TableOps] FINAL POSITION: {result.final_position}")
     print(f"[TableOps] TARGET POSITION: {result.target_position}")
     print(f"[TableOps] PLANAR ERROR: {result.planar_error:.4f} m")
 
+    milestone = 4 if args.demo_correction else 3
+
     if result.success:
         print("[TableOps] VERIFY: placement accepted")
         print("[TableOps] SUCCESS")
-        print("MILESTONE 3: SUCCESS")
+        print(f"MILESTONE {milestone}: SUCCESS")
         return _finish(0, visual=not args.headless)
 
     print("[TableOps] VERIFY: placement rejected")
     print("[TableOps] FAILED")
-    print("MILESTONE 3: FAILED")
+    print(f"MILESTONE {milestone}: FAILED")
     return _finish(1, visual=not args.headless)
 
 
