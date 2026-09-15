@@ -8,7 +8,7 @@ The system is designed around a closed-loop Physical AI workflow:
 
 **Perceive → Reason → Plan → Act → Verify → Correct**
 
-The current prototype performs natural-language-guided table manipulation in MuJoCo, verifies the result, and can physically correct an intentionally bad placement before completing the task.
+The current prototype combines natural-language reasoning, Intel OpenVINO GenAI, MuJoCo manipulation, closed-loop placement verification, and correction behavior.
 
 ## Current Hackathon Status
 
@@ -18,9 +18,7 @@ Load a MuJoCo tabletop scene and verify programmatic object movement.
 
 ### Milestone 2 — Complete
 
-An actuated MuJoCo manipulator approaches a plate, aligns with it, closes its gripper, lifts it, transfers it to the target, releases it, retreats, and verifies final placement.
-
-The controller does **not** rewrite the plate free-joint position to perform the move. Cartesian motion is generated through MuJoCo actuators. A temporary equality constraint models a stable grasp and is released at placement.
+An actuated MuJoCo manipulator approaches a plate, grasps it, transfers it to a target, releases it, retreats, and verifies the result. Robot motion is generated through MuJoCo actuators; the controller does not rewrite the plate free-joint position to perform the move.
 
 ### Milestone 3 — Complete
 
@@ -28,33 +26,26 @@ Natural-language commands such as `Set the plate.` and `Set the table for one.` 
 
 ### Milestone 4 — Complete
 
-Closed-loop recovery is working. TableOps can intentionally place the plate outside tolerance, detect the error, execute a correction action, re-verify the scene, and finish successfully.
+Closed-loop recovery is working. TableOps can detect an intentionally bad placement, execute a correction action, re-verify the scene, and finish successfully.
 
-### Milestone 5 — Implementation complete / local OpenVINO model validation next
+### Milestone 5 — Complete
 
-An Intel OpenVINO GenAI reasoning adapter now maps natural-language commands into the same verified `TaskIntent` contract. The deterministic parser remains available as a fallback so a model/runtime problem does not destroy the robotics demo.
+Intel OpenVINO GenAI locally maps natural-language commands into the verified `TaskIntent` contract. The deterministic parser remains available as a fallback so an AI-runtime problem does not destroy the robotics demo.
+
+### Milestone 6 — Implementation ready for local validation
+
+A new two-place MuJoCo scene contains two plates, two target place settings, and two independently actuated manipulators. The bimanual controller coordinates both arms through approach, grasp, lift, transfer, placement, release, retreat, and final verification. The correction path can intentionally disturb the right-hand placement and use that arm to repair it before release.
 
 Current end-to-end target:
 
-**Natural language → OpenVINO GenAI → Plan → Act → Verify → Correct → Success**
-
-## Objectives
-
-- Observe a simulated tabletop scene.
-- Convert natural-language or spoken instructions into structured tasks.
-- Use Intel OpenVINO GenAI for local task reasoning.
-- Plan manipulation actions.
-- Execute robotic pick-and-place in MuJoCo.
-- Verify the resulting scene.
-- Correct failed or incomplete placements.
-- Extend to additional objects and a second manipulator.
+**Natural language → OpenVINO GenAI → Bimanual plan → Two-arm actuation → Verify → Correct → Success**
 
 ## Stack
 
 - Python 3.11+
 - MuJoCo 3.3+
 - Intel OpenVINO GenAI
-- Qwen2.5-1.5B-Instruct INT4 OpenVINO IR model for the Milestone 5 local reasoning demo
+- Qwen2.5-1.5B-Instruct INT4 OpenVINO IR model
 - Pytest
 - Docker for reproducible execution
 - Optional speech-to-text / voice interface in a later milestone
@@ -63,29 +54,25 @@ Current end-to-end target:
 
 ```text
 champ-tableops/
-├── .github/workflows/
-├── assets/
 ├── demo/
 │   └── tableops_cli.py
-├── docker/
 ├── docs/
 │   └── openvino_reasoning.md
-├── outputs/
-├── scripts/
 ├── simulation/
 │   ├── demo_pick_place.py
 │   ├── milestone1.py
 │   ├── table_scene.xml
-│   └── table_scene_v2.xml
+│   ├── table_scene_v2.xml
+│   └── table_scene_bimanual.xml
 ├── src/champ_tableops/
 │   ├── manipulation/
-│   ├── perception/
+│   │   ├── mujoco_pick_place.py
+│   │   └── mujoco_bimanual.py
 │   ├── planning/
 │   ├── reasoning/
 │   │   ├── command_parser.py
 │   │   └── openvino_reasoner.py
-│   ├── verification/
-│   └── voice/
+│   └── verification/
 ├── requirements.txt
 ├── requirements-openvino.txt
 └── tests/
@@ -103,37 +90,14 @@ pip install -r requirements.txt
 pytest -v
 ```
 
-### Windows PowerShell
-
-```powershell
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-pytest -v
-```
-
-## Known-Good Deterministic Demo
-
-Headless:
+## Single-Arm Demos
 
 ```bash
 python demo/tableops_cli.py --headless --fast "Set the plate."
-```
-
-Visual:
-
-```bash
-python demo/tableops_cli.py "Set the plate."
-```
-
-Closed-loop correction:
-
-```bash
 python demo/tableops_cli.py --headless --fast --demo-correction "Set the plate."
 ```
 
-## Milestone 5 — Intel OpenVINO GenAI
+## Intel OpenVINO GenAI
 
 Install the optional stack:
 
@@ -141,20 +105,7 @@ Install the optional stack:
 python -m pip install -r requirements-openvino.txt
 ```
 
-Download the recommended OpenVINO-optimized model:
-
-```bash
-python - <<'PY'
-from huggingface_hub import snapshot_download
-
-snapshot_download(
-    repo_id="OpenVINO/Qwen2.5-1.5B-Instruct-int4-ov",
-    local_dir="models/qwen2.5-1.5b-instruct-int4-ov",
-)
-PY
-```
-
-Configure the model:
+Configure the downloaded OpenVINO model:
 
 ```bash
 export CHAMP_TABLEOPS_OPENVINO_MODEL="$PWD/models/qwen2.5-1.5b-instruct-int4-ov"
@@ -170,30 +121,60 @@ python demo/tableops_cli.py \
   "Set the plate."
 ```
 
-Full OpenVINO + recovery demo:
+## Milestone 6 — Bimanual Table Setting
+
+Deterministic headless validation:
+
+```bash
+python demo/tableops_cli.py \
+  --headless --fast \
+  --reasoner deterministic \
+  "Set the table for two."
+```
+
+Bimanual Verify → Correct demonstration:
+
+```bash
+python demo/tableops_cli.py \
+  --headless --fast \
+  --reasoner deterministic \
+  --demo-correction \
+  "Set the table for two."
+```
+
+OpenVINO + bimanual visual demo:
 
 ```bash
 python demo/tableops_cli.py \
   --reasoner openvino \
-  --demo-correction \
-  "Set the plate."
+  "Set the table for two."
 ```
 
-See `docs/openvino_reasoning.md` for setup details and fallback behavior.
+Expected successful bimanual output ends with:
+
+```text
+[TableOps] VERIFY: both place settings accepted
+[TableOps] SUCCESS
+MILESTONE 6: SUCCESS
+```
 
 ## Safety Boundary
 
-The AI reasoner does not directly control robot joints. It must emit the currently verified controller contract:
+The AI reasoner does not directly control robot joints. It must emit one of the verified task contracts.
+
+Single place setting:
 
 ```json
-{
-  "action": "place",
-  "object": "plate",
-  "target": "place_setting_1"
-}
+{"action": "place", "object": "plate", "target": "place_setting_1"}
 ```
 
-Any model-produced task outside that contract is rejected before manipulation begins.
+Bimanual two-place setting:
+
+```json
+{"action": "set_table", "object": "plates", "target": "place_settings_1_2"}
+```
+
+Any other model-produced task is rejected before manipulation begins.
 
 ## Roadmap
 
@@ -205,11 +186,11 @@ Any model-produced task outside that contract is rejected before manipulation be
 
 **Milestone 4 — Complete:** Verify → Correct closed-loop recovery.
 
-**Milestone 5 — Current:** Intel OpenVINO GenAI reasoning, pending local model validation.
+**Milestone 5 — Complete:** Intel OpenVINO GenAI reasoning.
 
-**Milestone 6 — Next:** add a second table object and expand scene/task planning.
+**Milestone 6 — Current:** coordinated two-manipulator / two-place table setting.
 
-**Milestone 7 — Stretch:** second manipulator / bimanual coordination, richer perception, and voice input.
+**Milestone 7 — Stretch:** additional table objects, richer perception, voice input, and presentation hardening.
 
 ## License
 
