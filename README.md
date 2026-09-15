@@ -4,11 +4,11 @@
 
 CHAMP TableOps is a hackathon prototype for the **AI Infra Summit Hackathon 2026**.
 
-The system is designed around a closed-loop Physical AI workflow:
+The system implements a closed-loop Physical AI workflow:
 
-**Perceive → Reason → Plan → Act → Verify → Correct**
+**Perceive → Reason → Plan → Act → Verify → Correct → Re-Verify**
 
-The current prototype combines natural-language reasoning, Intel OpenVINO GenAI, MuJoCo manipulation, closed-loop placement verification, and correction behavior.
+The current prototype combines natural-language reasoning, Intel OpenVINO GenAI, two coordinated MuJoCo manipulators, placement verification, and physical correction behavior.
 
 ## Current Hackathon Status
 
@@ -30,15 +30,48 @@ Closed-loop recovery is working. TableOps can detect an intentionally bad placem
 
 ### Milestone 5 — Complete
 
-Intel OpenVINO GenAI locally maps natural-language commands into the verified `TaskIntent` contract. The deterministic parser remains available as a fallback so an AI-runtime problem does not destroy the robotics demo.
+Intel OpenVINO GenAI locally maps natural-language commands into the verified `TaskIntent` contract. The deterministic parser remains available as a fallback.
 
-### Milestone 6 — Implementation ready for local validation
+### Milestone 6 — Complete
 
-A new two-place MuJoCo scene contains two plates, two target place settings, and two independently actuated manipulators. The bimanual controller coordinates both arms through approach, grasp, lift, transfer, placement, release, retreat, and final verification. The correction path can intentionally disturb the right-hand placement and use that arm to repair it before release.
+A two-place MuJoCo scene contains two plates, two target place settings, and two independently actuated manipulators. The bimanual controller coordinates both arms through approach, grasp, lift, transfer, placement, release, retreat, and verification. The recovery path can intentionally disturb the right-hand placement by 10 cm and use the right manipulator to repair it before release.
 
-Current end-to-end target:
+Current end-to-end path:
 
-**Natural language → OpenVINO GenAI → Bimanual plan → Two-arm actuation → Verify → Correct → Success**
+**Natural language → Intel OpenVINO GenAI → Bimanual plan → Two-arm actuation → Verify → Correct → Re-Verify → Success**
+
+## Final Showcase
+
+The polished hackathon path is now a single command:
+
+```bash
+python demo/tableops_cli.py --showcase
+```
+
+`--showcase` fixes the live task to:
+
+```text
+Set the table for two.
+```
+
+It then requires the Intel OpenVINO GenAI reasoner, runs the two-arm MuJoCo scene, deliberately injects a 10 cm right-hand placement error, detects the miss, physically corrects it, verifies both place settings again, and reports the final showcase result.
+
+For a headless preflight:
+
+```bash
+python demo/tableops_cli.py --showcase --headless --fast
+```
+
+Expected final lines include:
+
+```text
+[TableOps] VERIFY: both place settings accepted
+[TableOps] SUCCESS
+MILESTONE 6: SUCCESS
+CHAMP TABLEOPS SHOWCASE: SUCCESS
+```
+
+See `docs/final_showcase_runbook.md` for the live-demo checklist, proof points, fallback command, and short narration.
 
 ## Stack
 
@@ -48,7 +81,6 @@ Current end-to-end target:
 - Qwen2.5-1.5B-Instruct INT4 OpenVINO IR model
 - Pytest
 - Docker for reproducible execution
-- Optional speech-to-text / voice interface in a later milestone
 
 ## Repository Layout
 
@@ -57,6 +89,7 @@ champ-tableops/
 ├── demo/
 │   └── tableops_cli.py
 ├── docs/
+│   ├── final_showcase_runbook.md
 │   └── openvino_reasoning.md
 ├── simulation/
 │   ├── demo_pick_place.py
@@ -90,14 +123,7 @@ pip install -r requirements.txt
 pytest -v
 ```
 
-## Single-Arm Demos
-
-```bash
-python demo/tableops_cli.py --headless --fast "Set the plate."
-python demo/tableops_cli.py --headless --fast --demo-correction "Set the plate."
-```
-
-## Intel OpenVINO GenAI
+## Intel OpenVINO GenAI Setup
 
 Install the optional stack:
 
@@ -112,18 +138,23 @@ export CHAMP_TABLEOPS_OPENVINO_MODEL="$PWD/models/qwen2.5-1.5b-instruct-int4-ov"
 export CHAMP_TABLEOPS_OPENVINO_DEVICE=CPU
 ```
 
-Run explicit Intel reasoning:
+If `CHAMP_TABLEOPS_OPENVINO_MODEL` is not set, showcase mode will automatically use `models/qwen2.5-1.5b-instruct-int4-ov` when that directory exists.
+
+## Individual Demo Modes
+
+Single-arm deterministic demo:
 
 ```bash
-python demo/tableops_cli.py \
-  --headless --fast \
-  --reasoner openvino \
-  "Set the plate."
+python demo/tableops_cli.py --headless --fast "Set the plate."
 ```
 
-## Milestone 6 — Bimanual Table Setting
+Single-arm Verify → Correct demo:
 
-Deterministic headless validation:
+```bash
+python demo/tableops_cli.py --headless --fast --demo-correction "Set the plate."
+```
+
+Bimanual deterministic demo:
 
 ```bash
 python demo/tableops_cli.py \
@@ -132,7 +163,7 @@ python demo/tableops_cli.py \
   "Set the table for two."
 ```
 
-Bimanual Verify → Correct demonstration:
+Bimanual deterministic correction demo:
 
 ```bash
 python demo/tableops_cli.py \
@@ -140,22 +171,6 @@ python demo/tableops_cli.py \
   --reasoner deterministic \
   --demo-correction \
   "Set the table for two."
-```
-
-OpenVINO + bimanual visual demo:
-
-```bash
-python demo/tableops_cli.py \
-  --reasoner openvino \
-  "Set the table for two."
-```
-
-Expected successful bimanual output ends with:
-
-```text
-[TableOps] VERIFY: both place settings accepted
-[TableOps] SUCCESS
-MILESTONE 6: SUCCESS
 ```
 
 ## Safety Boundary
@@ -188,9 +203,11 @@ Any other model-produced task is rejected before manipulation begins.
 
 **Milestone 5 — Complete:** Intel OpenVINO GenAI reasoning.
 
-**Milestone 6 — Current:** coordinated two-manipulator / two-place table setting.
+**Milestone 6 — Complete:** coordinated two-manipulator / two-place table setting.
 
-**Milestone 7 — Stretch:** additional table objects, richer perception, voice input, and presentation hardening.
+**Final Showcase — Current:** presentation hardening, rehearsal, recording, and submission packaging.
+
+**Stretch:** additional table objects, richer perception, and voice input only if the frozen showcase remains stable.
 
 ## License
 
