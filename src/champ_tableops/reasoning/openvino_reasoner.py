@@ -30,20 +30,18 @@ PipelineFactory = Callable[[str, str], Any]
 
 
 def build_reasoning_prompt(command: str) -> str:
-    """Build a constrained prompt whose output maps to the TableOps task contract."""
+    """Build a constrained prompt whose output maps to a verified TableOps task."""
     return f"""You are the CHAMP TableOps task reasoner.
 Convert the user command into exactly one JSON object and nothing else.
 
-Supported task for this hackathon milestone:
-- action: place
-- object: plate
-- target: place_setting_1
+Supported verified tasks:
+1. One plate / one place setting:
+   {{"supported": true, "action": "place", "object": "plate", "target": "place_setting_1"}}
+2. Two plates / two place settings using the bimanual controller:
+   {{"supported": true, "action": "set_table", "object": "plates", "target": "place_settings_1_2"}}
 
-If the command requests anything outside that capability, return:
+If the command requests anything outside those capabilities, return:
 {{"supported": false, "reason": "short explanation"}}
-
-If supported, return exactly:
-{{"supported": true, "action": "place", "object": "plate", "target": "place_setting_1"}}
 
 User command: {command!r}
 JSON:"""
@@ -95,25 +93,28 @@ def _intent_from_payload(payload: dict[str, Any], command: str) -> TaskIntent:
     action = payload.get("action")
     object_name = payload.get("object")
     target = payload.get("target")
-
-    expected = ("place", "plate", "place_setting_1")
     actual = (action, object_name, target)
-    if actual != expected:
+
+    verified_tasks = {
+        ("place", "plate", "place_setting_1"),
+        ("set_table", "plates", "place_settings_1_2"),
+    }
+    if actual not in verified_tasks:
         raise OpenVINOReasoningError(
             "OpenVINO reasoner produced a task outside the verified controller contract: "
             f"action={action!r}, object={object_name!r}, target={target!r}."
         )
 
     return TaskIntent(
-        action="place",
-        object_name="plate",
-        target="place_setting_1",
+        action=str(action),
+        object_name=str(object_name),
+        target=str(target),
         source_command=command,
     )
 
 
 class OpenVINOReasoner:
-    """OpenVINO GenAI adapter that emits the same TaskIntent used by Milestone 3."""
+    """OpenVINO GenAI adapter that emits a verified TableOps TaskIntent."""
 
     def __init__(
         self,
@@ -179,12 +180,7 @@ def reason_command(
     device: str = "CPU",
     pipeline_factory: PipelineFactory | None = None,
 ) -> ReasoningResult:
-    """Resolve a command with OpenVINO when configured, preserving a safe fallback.
-
-    backend="auto" uses OpenVINO when a model path is supplied. If initialization or
-    generation fails, the known-good deterministic Milestone 3 parser remains available
-    so the physical demo is not lost because of an AI-runtime issue.
-    """
+    """Resolve a command with OpenVINO when configured, preserving a safe fallback."""
     backend = backend.lower().strip()
     if backend not in {"auto", "deterministic", "openvino"}:
         raise ValueError(f"Unknown reasoning backend: {backend}")
