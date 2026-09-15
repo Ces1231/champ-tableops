@@ -1,0 +1,103 @@
+<mujoco model="champ_tableops_bimanual">
+  <compiler angle="radian" autolimits="true"/>
+  <option timestep="0.002" gravity="0 0 -9.81"/>
+
+  <default>
+    <joint damping="25" armature="0.02"/>
+    <geom friction="0.9 0.05 0.01"/>
+  </default>
+
+  <worldbody>
+    <light pos="0 -0.5 2.5" dir="0 0 -1" diffuse="0.9 0.9 0.9"/>
+    <camera name="demo" pos="0 -2.15 1.25" xyaxes="1 0 0 0 0.5 0.866"/>
+
+    <geom name="floor" type="plane" pos="0 0 -0.01" size="2 2 0.1" rgba="0.10 0.12 0.16 1"/>
+    <geom name="table" type="box" pos="0 0 0" size="0.75 0.55 0.05" rgba="0.34 0.20 0.10 1"/>
+
+    <site name="target_left" type="cylinder" pos="0.35 -0.18 0.052" size="0.13 0.002" rgba="0.1 1 0.25 0.45"/>
+    <site name="target_right" type="cylinder" pos="0.35 0.18 0.052" size="0.13 0.002" rgba="0.1 1 0.25 0.45"/>
+
+    <body name="plate_left" pos="-0.35 -0.18 0.075">
+      <freejoint/>
+      <geom name="plate_left_geom" type="cylinder" size="0.11 0.025" mass="0.25" rgba="0.92 0.94 1 1"/>
+      <site name="plate_left_grasp_site" pos="0 0 0.025" size="0.012" rgba="0 0.7 1 0.7"/>
+    </body>
+
+    <body name="plate_right" pos="-0.35 0.18 0.075">
+      <freejoint/>
+      <geom name="plate_right_geom" type="cylinder" size="0.11 0.025" mass="0.25" rgba="0.96 0.96 0.98 1"/>
+      <site name="plate_right_grasp_site" pos="0 0 0.025" size="0.012" rgba="0 0.7 1 0.7"/>
+    </body>
+
+    <geom name="left_robot_pedestal" type="box" pos="-0.67 -0.18 0.32" size="0.07 0.07 0.32" rgba="0.12 0.30 0.82 1" contype="0" conaffinity="0"/>
+    <geom name="left_robot_beam" type="box" pos="-0.05 -0.18 0.70" size="0.68 0.04 0.045" rgba="0.16 0.38 0.95 1" contype="0" conaffinity="0"/>
+
+    <body name="left_robot_x" pos="-0.60 -0.18 0.70" gravcomp="1">
+      <joint name="left_slide_x" type="slide" axis="1 0 0" range="0 1.15"/>
+      <geom type="box" size="0.05 0.05 0.05" rgba="0.05 0.75 1 1" contype="0" conaffinity="0"/>
+      <body name="left_robot_y" gravcomp="1">
+        <joint name="left_slide_y" type="slide" axis="0 1 0" range="-0.08 0.08"/>
+        <geom type="box" size="0.045 0.045 0.045" rgba="0.05 0.65 0.9 1" contype="0" conaffinity="0"/>
+        <body name="left_gripper" gravcomp="1">
+          <joint name="left_slide_z" type="slide" axis="0 0 1" range="-0.52 0" damping="55"/>
+          <geom type="capsule" fromto="0 0 0 0 0 -0.10" size="0.025" rgba="0.12 0.82 0.95 1" contype="0" conaffinity="0"/>
+          <geom type="box" pos="0 0 -0.11" size="0.055 0.105 0.018" rgba="0.08 0.16 0.24 1" contype="0" conaffinity="0"/>
+          <body name="left_finger_a" pos="0 -0.115 -0.15" gravcomp="1">
+            <joint name="left_finger_a_joint" type="slide" axis="0 1 0" range="0 0.04" damping="8"/>
+            <geom type="box" size="0.014 0.014 0.055" rgba="0.95 0.55 0.08 1" contype="0" conaffinity="0"/>
+          </body>
+          <body name="left_finger_b" pos="0 0.115 -0.15" gravcomp="1">
+            <joint name="left_finger_b_joint" type="slide" axis="0 -1 0" range="0 0.04" damping="8"/>
+            <geom type="box" size="0.014 0.014 0.055" rgba="0.95 0.55 0.08 1" contype="0" conaffinity="0"/>
+          </body>
+          <site name="left_grasp_site" pos="0 0 -0.155" size="0.015" rgba="1 0.2 0.1 0.8"/>
+        </body>
+      </body>
+    </body>
+
+    <geom name="right_robot_pedestal" type="box" pos="-0.67 0.18 0.32" size="0.07 0.07 0.32" rgba="0.55 0.18 0.78 1" contype="0" conaffinity="0"/>
+    <geom name="right_robot_beam" type="box" pos="-0.05 0.18 0.70" size="0.68 0.04 0.045" rgba="0.70 0.24 0.92 1" contype="0" conaffinity="0"/>
+
+    <body name="right_robot_x" pos="-0.60 0.18 0.70" gravcomp="1">
+      <joint name="right_slide_x" type="slide" axis="1 0 0" range="0 1.15"/>
+      <geom type="box" size="0.05 0.05 0.05" rgba="0.75 0.20 1 1" contype="0" conaffinity="0"/>
+      <body name="right_robot_y" gravcomp="1">
+        <joint name="right_slide_y" type="slide" axis="0 1 0" range="-0.08 0.08"/>
+        <geom type="box" size="0.045 0.045 0.045" rgba="0.65 0.18 0.90 1" contype="0" conaffinity="0"/>
+        <body name="right_gripper" gravcomp="1">
+          <joint name="right_slide_z" type="slide" axis="0 0 1" range="-0.52 0" damping="55"/>
+          <geom type="capsule" fromto="0 0 0 0 0 -0.10" size="0.025" rgba="0.82 0.25 0.95 1" contype="0" conaffinity="0"/>
+          <geom type="box" pos="0 0 -0.11" size="0.055 0.105 0.018" rgba="0.14 0.08 0.22 1" contype="0" conaffinity="0"/>
+          <body name="right_finger_a" pos="0 -0.115 -0.15" gravcomp="1">
+            <joint name="right_finger_a_joint" type="slide" axis="0 1 0" range="0 0.04" damping="8"/>
+            <geom type="box" size="0.014 0.014 0.055" rgba="1 0.62 0.16 1" contype="0" conaffinity="0"/>
+          </body>
+          <body name="right_finger_b" pos="0 0.115 -0.15" gravcomp="1">
+            <joint name="right_finger_b_joint" type="slide" axis="0 -1 0" range="0 0.04" damping="8"/>
+            <geom type="box" size="0.014 0.014 0.055" rgba="1 0.62 0.16 1" contype="0" conaffinity="0"/>
+          </body>
+          <site name="right_grasp_site" pos="0 0 -0.155" size="0.015" rgba="1 0.2 0.1 0.8"/>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <equality>
+    <weld name="left_grasp_weld" site1="left_grasp_site" site2="plate_left_grasp_site" active="false" solref="0.01 1"/>
+    <weld name="right_grasp_weld" site1="right_grasp_site" site2="plate_right_grasp_site" active="false" solref="0.01 1"/>
+  </equality>
+
+  <actuator>
+    <position name="left_x_position" joint="left_slide_x" kp="350" ctrlrange="0 1.15" ctrllimited="true"/>
+    <position name="left_y_position" joint="left_slide_y" kp="350" ctrlrange="-0.08 0.08" ctrllimited="true"/>
+    <position name="left_z_position" joint="left_slide_z" kp="500" ctrlrange="-0.52 0" ctrllimited="true"/>
+    <position name="left_grip_a" joint="left_finger_a_joint" kp="120" ctrlrange="0 0.04" ctrllimited="true"/>
+    <position name="left_grip_b" joint="left_finger_b_joint" kp="120" ctrlrange="0 0.04" ctrllimited="true"/>
+
+    <position name="right_x_position" joint="right_slide_x" kp="350" ctrlrange="0 1.15" ctrllimited="true"/>
+    <position name="right_y_position" joint="right_slide_y" kp="350" ctrlrange="-0.08 0.08" ctrllimited="true"/>
+    <position name="right_z_position" joint="right_slide_z" kp="500" ctrlrange="-0.52 0" ctrllimited="true"/>
+    <position name="right_grip_a" joint="right_finger_a_joint" kp="120" ctrlrange="0 0.04" ctrllimited="true"/>
+    <position name="right_grip_b" joint="right_finger_b_joint" kp="120" ctrlrange="0 0.04" ctrllimited="true"/>
+  </actuator>
+</mujoco>
