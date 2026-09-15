@@ -8,6 +8,7 @@ from champ_tableops.reasoning.command_parser import UnsupportedCommandError
 from champ_tableops.reasoning.openvino_reasoner import (
     OpenVINOReasoner,
     OpenVINOReasoningError,
+    build_reasoning_prompt,
     reason_command,
 )
 
@@ -50,6 +51,14 @@ def test_openvino_reasoner_maps_json_to_verified_task():
     assert result.intent.target == "place_setting_1"
     assert len(pipeline.calls) == 1
     assert pipeline.calls[0][1]["do_sample"] is False
+    assert pipeline.calls[0][1]["apply_chat_template"] is True
+
+
+def test_bimanual_prompt_explicitly_marks_showcase_command_supported():
+    prompt = build_reasoning_prompt("Set the table for two.")
+    assert '"action": "set_table"' in prompt
+    assert '"target": "place_settings_1_2"' in prompt
+    assert 'exact command "Set the table for two." is explicitly supported' in prompt
 
 
 def test_openvino_reasoner_accepts_decoded_results_and_fenced_json():
