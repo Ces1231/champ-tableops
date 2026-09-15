@@ -30,21 +30,40 @@ PipelineFactory = Callable[[str, str], Any]
 
 
 def build_reasoning_prompt(command: str) -> str:
-    """Build a constrained prompt whose output maps to a verified TableOps task."""
-    return f"""You are the CHAMP TableOps task reasoner.
-Convert the user command into exactly one JSON object and nothing else.
+    """Build a constrained classifier prompt for the verified TableOps tasks."""
+    return f"""You are a strict task classifier for CHAMP TableOps.
+Your job is ONLY to map the user's command to one of the verified JSON task contracts below.
+Return exactly one JSON object and no explanation.
 
-Supported verified tasks:
-1. One plate / one place setting:
-   {{"supported": true, "action": "place", "object": "plate", "target": "place_setting_1"}}
-2. Two plates / two place settings using the bimanual controller:
-   {{"supported": true, "action": "set_table", "object": "plates", "target": "place_settings_1_2"}}
+VERIFIED TASK A — one plate / one place setting:
+{{"supported": true, "action": "place", "object": "plate", "target": "place_setting_1"}}
 
-If the command requests anything outside those capabilities, return:
+VERIFIED TASK B — two plates / two place settings / bimanual table setting:
+{{"supported": true, "action": "set_table", "object": "plates", "target": "place_settings_1_2"}}
+
+UNSUPPORTED:
 {{"supported": false, "reason": "short explanation"}}
 
-User command: {command!r}
-JSON:"""
+Classification rules:
+- "Set the plate.", "Place the plate.", and "Set the table for one." are Task A.
+- "Set the table for two.", "Set a table for two.", and equivalent requests for TWO place settings are Task B.
+- The exact command "Set the table for two." is explicitly supported. It MUST return Task B.
+- Do not reject a supported command merely because it is phrased as an instruction.
+- Do not invent any task fields or values outside the contracts above.
+
+Examples:
+User: Set the plate.
+Assistant: {{"supported": true, "action": "place", "object": "plate", "target": "place_setting_1"}}
+
+User: Set the table for two.
+Assistant: {{"supported": true, "action": "set_table", "object": "plates", "target": "place_settings_1_2"}}
+
+User: Wash the dishes.
+Assistant: {{"supported": false, "reason": "Dish washing is not a verified TableOps task."}}
+
+Now classify this command.
+User: {command}
+Assistant:"""
 
 
 def _response_text(response: Any) -> str:
@@ -156,6 +175,7 @@ class OpenVINOReasoner:
                 prompt,
                 max_new_tokens=96,
                 do_sample=False,
+                apply_chat_template=True,
             )
         except Exception as exc:
             raise OpenVINOReasoningError(
