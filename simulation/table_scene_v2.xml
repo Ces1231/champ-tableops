@@ -3,7 +3,7 @@
   <option timestep="0.002" gravity="0 0 -9.81"/>
 
   <default>
-    <joint damping="8" armature="0.02"/>
+    <joint damping="25" armature="0.02"/>
     <geom friction="0.9 0.05 0.01"/>
   </default>
 
@@ -89,7 +89,7 @@
           conaffinity="0"/>
 
         <body name="gripper" gravcomp="1">
-          <joint name="slide_z" type="slide" axis="0 0 1" range="-0.52 0"/>
+          <joint name="slide_z" type="slide" axis="0 0 1" range="-0.52 0" damping="55"/>
           <geom
             type="capsule"
             fromto="0 0 0 0 0 -0.10"
@@ -106,7 +106,7 @@
             conaffinity="0"/>
 
           <body name="left_finger" pos="0 -0.14 -0.15" gravcomp="1">
-            <joint name="left_finger_joint" type="slide" axis="0 1 0" range="0 0.05" damping="3"/>
+            <joint name="left_finger_joint" type="slide" axis="0 1 0" range="0 0.05" damping="8"/>
             <geom
               type="box"
               size="0.014 0.014 0.055"
@@ -116,7 +116,7 @@
           </body>
 
           <body name="right_finger" pos="0 0.14 -0.15" gravcomp="1">
-            <joint name="right_finger_joint" type="slide" axis="0 -1 0" range="0 0.05" damping="3"/>
+            <joint name="right_finger_joint" type="slide" axis="0 -1 0" range="0 0.05" damping="8"/>
             <geom
               type="box"
               size="0.014 0.014 0.055"
@@ -148,7 +148,7 @@
   <actuator>
     <position name="x_position" joint="slide_x" kp="350" ctrlrange="0 1.15" ctrllimited="true"/>
     <position name="y_position" joint="slide_y" kp="350" ctrlrange="-0.35 0.35" ctrllimited="true"/>
-    <position name="z_position" joint="slide_z" kp="900" ctrlrange="-0.52 0" ctrllimited="true"/>
+    <position name="z_position" joint="slide_z" kp="500" ctrlrange="-0.52 0" ctrllimited="true"/>
     <position name="left_grip" joint="left_finger_joint" kp="120" ctrlrange="0 0.05" ctrllimited="true"/>
     <position name="right_grip" joint="right_finger_joint" kp="120" ctrlrange="0 0.05" ctrllimited="true"/>
   </actuator>
