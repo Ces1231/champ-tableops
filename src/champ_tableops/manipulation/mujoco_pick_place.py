@@ -282,7 +282,8 @@ def run_pick_place(
 
     from mujoco import viewer as mujoco_viewer
 
-    with mujoco_viewer.launch_passive(model, data) as viewer:
+    viewer = mujoco_viewer.launch_passive(model, data)
+    try:
         return _execute(
             model,
             data,
@@ -290,3 +291,7 @@ def run_pick_place(
             realtime=realtime,
             verbose=verbose,
         )
+    finally:
+        # Explicitly close the passive viewer so WSLg/GLFW does not leave the
+        # visual demo window or Python process alive after the run completes.
+        viewer.close()
